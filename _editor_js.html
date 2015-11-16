@@ -1,0 +1,113 @@
+{% load wagtailadmin_tags compress static %}
+
+{% comment %}
+    Javascript declarations to be included on the 'create page' and 'edit page' views
+{% endcomment %}
+
+<script>
+    window.chooserUrls = {
+        'pageChooser': '{% url "wagtailadmin_choose_page" %}'
+    };
+</script>
+
+{% compress js %}
+    <script src="{% static 'wagtailadmin/js/vendor/rangy-core.js' %}"></script>
+    <script src="{% static 'wagtailadmin/js/vendor/hallo.js' %}"></script>
+    <script src="{% static 'wagtailadmin/js/vendor/tag-it.js' %}"></script>
+    <script src="{% static 'wagtailadmin/js/expanding_formset.js' %}"></script>
+    <script src="{% static 'wagtailadmin/js/modal-workflow.js' %}"></script>
+    <script src="{% static 'wagtailadmin/js/hallo-plugins/hallo-wagtaillink.js' %}"></script>
+    <script src="{% static 'wagtailadmin/js/hallo-plugins/hallo-hr.js' %}"></script>
+    <script src="{% static 'wagtailadmin/js/hallo-plugins/hallo-requireparagraphs.js' %}"></script>
+    <script src="{% static 'wagtailadmin/js/page-editor.js' %}"></script>
+    <script src="{% static 'wagtailadmin/js/page-chooser.js' %}"></script>
+    <script src="{% static 'admin/js/urlify.js' %}"></script>
+    <script src="{% static 'wagtailadmin/js/privacy-switch.js' %}"></script>
+
+    {% hook_output 'insert_editor_js' %}
+{% endcompress %}
+
+{% include "wagtailadmin/shared/datetimepicker_translations.html" %}
+
+{% comment %}
+    Additional js from widgets media. Allows for custom widgets in admin panel.
+{% endcomment %}
+{{ edit_handler.form.media.js }}
+
+{% comment %}
+    Additional HTML code that edit handlers define through 'html_declarations'. (Technically this isn't Javascript, but it will generally be data that exists for Javascript to work with...)
+{% endcomment %}
+{{ edit_handler.html_declarations }}
+<script src="//tinymce.cachefly.net/4.0/tinymce.min.js"></script>
+<script type="text/javascript">
+    tinyMCE.PluginManager.add('stylebuttons', function(editor, url) {
+      ['p', 'h3', 'h4', 'h5', 'h6'].forEach(function(name){
+       editor.addButton("style-" + name, {
+           tooltip: "Toggle " + name,
+             text: name.toUpperCase(),
+             onClick: function() { editor.execCommand('mceToggleFormat', false, name); },
+             onPostRender: function() {
+                 var self = this, setup = function() {
+                     editor.formatter.formatChanged(name, function(state) {
+                         self.active(state);
+                     });
+                 };
+                 editor.formatter ? setup() : editor.on('init', setup);
+             }
+         })
+      });
+    });
+    tinyInit = function(editor_id) {
+        if (!editor_id){
+            return false;
+        }
+        $("#" + editor_id).show();
+        $("#" + editor_id + "-html").hide();
+        var clickfield = editor_id.substring(0, editor_id.length-5) + 'click';
+        $("#" + clickfield).hide();
+
+        tinymce.init({
+
+            selector: "#" + editor_id,
+            plugins: [
+                "autolink lists link anchor",
+                "fullscreen",
+                "table",
+                "stylebuttons",
+            ],
+            menubar: false,
+            toolbar: "bold italic | wagtaillink link | bullist numlist | table | style-p style-h3 style-h4 style-h5 style-h6",
+            rel_list: [{title: 'Follow', value: 'follow'},{title: 'No-Follow', value: 'nofollow'}],
+            setup: function(editor) {
+                editor.addButton('wagtaillink', {
+                    title: 'Internal link',
+                    text : 'Page',
+                    onclick: function() {
+                        editor.focus();
+                        return ModalWorkflow({
+                            url: window.chooserUrls.pageChooser + '?allow_external_link=true&allow_email_link=true',
+                            responses: {
+                                pageChosen: function(pageData) {
+                                    editor.selection.setContent('<a href="' + pageData.url + '" data-id="' + pageData.id + '" data-linktype="page">' + editor.selection.getContent() + '</a>');
+                                }
+                            }
+                        });
+                    }
+                });
+            }
+        });
+    };
+    registerField = function (field_id) {
+        var myTextarea = $("#" + field_id),
+            container_field = field_id.substring(0, field_id.length-5) + 'click';
+
+        myTextarea.hide();
+        myTextarea.before('<div id="'+ container_field + '"><a class="button icon icon-edit button-small">Show Editor</a></div>');
+        myTextarea.after('<div id="'+ field_id + '-html">' + myTextarea.val() + '</div>');
+
+        $("#" + container_field).click(function(event) {
+            event.preventDefault();
+            tinyInit(field_id);
+        })
+    }
+</script>
